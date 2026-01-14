@@ -1,37 +1,37 @@
 # CCSEMO_exp
 
-基于预训练音频模型和音高特征融合的语音情感回归项目。
+Speech Emotion Regression via Pretrained Audio Models and Pitch Feature Fusion.
 
-## 项目简介
+## Overview
 
-本项目用于从语音中预测情感维度（Valence 效价 和 Arousal 唤醒度）。通过结合预训练音频模型（Wav2Vec2、HuBERT、WavLM）与音高特征，使用多头注意力机制进行特征融合，实现情感连续值预测。
+This project predicts continuous emotional dimensions (Valence and Arousal) from speech by combining pretrained audio models (Wav2Vec2, HuBERT, WavLM) with pitch features using multi-head attention fusion.
 
-**支持数据集：**
-- CCSEMO（中文情感语音）
-- IEMOCAP（英文多模态情感）
-- MSP-PODCAST（大规模播客情感）
+**Supported Datasets:**
+- CCSEMO (Chinese emotional speech)
+- IEMOCAP (English multimodal emotion)
+- MSP-PODCAST (Large-scale podcast emotion)
 
-**主要评价指标：** CCC (Concordance Correlation Coefficient)
+**Primary Metric:** CCC (Concordance Correlation Coefficient)
 
 ---
 
-## 环境配置
+## Environment Setup
 
-### 1. Python 环境
+### 1. Python Environment
 
-本项目使用 `uv` 进行依赖管理，需要 Python 3.12+。
+This project uses `uv` for dependency management and requires Python 3.12+.
 
 ```bash
-# 安装依赖
+# Install dependencies
 uv sync
 
-# 或使用 pip（不推荐）
+# Or use pip (not recommended)
 pip install -e .
 ```
 
-### 2. 预训练模型准备
+### 2. Pretrained Models
 
-将预训练模型放在 `pretrained_model/` 目录下：
+Place pretrained models in the `pretrained_model/` directory:
 
 ```
 pretrained_model/
@@ -40,130 +40,128 @@ pretrained_model/
 └── wavlm-large/
 ```
 
-可从 HuggingFace 下载对应模型。
+Download models from HuggingFace.
 
 ---
 
-## 数据准备
+## Data Preparation
 
-### 1. 标签文件格式
+### 1. Label File Format
 
-标签文件存放在 `data/labels/<DATASET>/` 目录，格式为 CSV，必须包含以下列：
+Label files are stored in `data/labels/<DATASET>/` as CSV files with the following columns:
 
-| 列名 | 说明 |
-|------|------|
-| `name` | 样本唯一标识 |
-| `audio_path` | 音频文件路径 |
-| `V` | Valence（效价）标签 |
-| `A` | Arousal（唤醒度）标签 |
-| `split_set` | 数据集划分（train/dev/test） |
+| Column | Description |
+|--------|-------------|
+| `name` | Unique sample identifier |
+| `audio_path` | Path to audio file |
+| `V` | Valence label |
+| `A` | Arousal label |
+| `split_set` | Dataset split (train/dev/test) |
 
-### 2. 音高特征预计算
+### 2. Precompute Pitch Features
 
-训练前需要预计算音高特征（使用 Praat/Parselmouth）：
+Pitch features must be precomputed before training (using Praat/Parselmouth):
 
 ```bash
-# 为 CCSEMO 数据集预计算所有划分的音高特征
+# Precompute pitch for CCSEMO dataset (all splits)
 uv run python scripts/precompute_pitch.py --dataset ccsemo --split all
 
-# 为所有数据集预计算
+# Precompute for all datasets
 uv run python scripts/precompute_pitch.py --dataset all --split all
 ```
 
-音高特征缓存在 `data/processed/pitch_cache_<dataset>/` 目录。
+Pitch features are cached in `data/processed/pitch_cache_<dataset>/`.
 
-### 3. 生成交叉验证划分（可选）
+### 3. Generate Cross-Validation Splits (Optional)
 
 ```bash
-# 为 CCSEMO 创建 5 折说话人独立交叉验证
+# Create 5-fold speaker-independent CV for CCSEMO
 uv run python scripts/make_ccsemo_5fold_speaker_cv.py
 ```
 
 ---
 
-## 训练模型
+## Training
 
-### 基本训练命令
+### Basic Training Commands
 
 ```bash
-# 使用默认配置训练
+# Train with default config
 uv run python src/train.py --config configs/CCSEMO/with_norm.yaml
 
-# 指定预训练模型
+# Specify pretrained model
 uv run python src/train.py \
     --config configs/CCSEMO/with_norm.yaml \
     --pm wav2vec2-large-robust
 
-# 可选预训练模型：
+# Available pretrained models:
 # - wav2vec2-large-robust
 # - hubert-large
 # - wavlm-large
 ```
 
-### 配置文件说明
+### Configuration Parameters
 
-配置文件位于 `configs/<DATASET>/{with_norm,no_norm}.yaml`，主要参数：
+Config files are located in `configs/<DATASET>/{with_norm,no_norm}.yaml`. Key parameters:
 
-| 参数 | 说明 | 可选值 |
-|------|------|--------|
-| `audio_model_name` | 预训练模型路径 | 见上方预训练模型列表 |
-| `task` | 任务模式 | `basemodel`（纯音频）<br>`pitch_and_wav2vec2`（音频+音高） |
-| `target` | 预测目标 | `both`（V+A）, `V`, `A` |
-| `embedding` | 音高嵌入方式 | `linear`, `cnn` |
-| `text_cap_path` | 标签文件路径 | CSV 文件路径 |
-| `pitch_cache_dir` | 音高缓存目录 | 默认 `data/processed/pitch_cache_<dataset>` |
+| Parameter | Description | Options |
+|-----------|-------------|---------|
+| `audio_model_name` | Path to pretrained model | See above model list |
+| `task` | Task mode | `basemodel` (audio only)<br>`pitch_and_wav2vec2` (audio + pitch) |
+| `target` | Prediction target | `both` (V+A), `V`, `A` |
+| `embedding` | Pitch embedding type | `linear`, `cnn` |
+| `text_cap_path` | Path to label CSV | CSV file path |
+| `pitch_cache_dir` | Pitch cache directory | Default: `data/processed/pitch_cache_<dataset>` |
 
 ---
 
-## 项目结构
+## Project Structure
 
 ```
 CCSEMO_exp/
-├── configs/                    # 配置文件
+├── configs/                    # Configuration files
 │   ├── CCSEMO/
 │   ├── IEMOCAP/
 │   └── MSP-PODCAST/
 ├── data/
-│   ├── labels/                 # 标签 CSV 文件
-│   └── processed/              # 预处理数据缓存
-├── pretrained_model/           # 预训练模型
-├── scripts/                    # 数据处理脚本
-│   ├── precompute_pitch.py     # 音高预计算
+│   ├── labels/                 # Label CSV files
+│   └── processed/              # Preprocessed data cache
+├── pretrained_model/           # Pretrained models
+├── scripts/                    # Data processing scripts
+│   ├── precompute_pitch.py     # Pitch precomputation
 │   └── make_ccsemo_5fold_speaker_cv.py
 ├── src/
-│   ├── train.py                # 训练入口
+│   ├── train.py                # Training entry point
 │   ├── model/
-│   │   └── iemocap_audio_model.py  # AudioClassifier 模型
+│   │   └── iemocap_audio_model.py  # AudioClassifier model
 │   ├── data/
-│   │   └── audio_parsing_dataset.py  # 数据加载器
-│   ├── losses/                 # 损失函数
-│   ├── metrics/                # 评价指标（CCC, MSE, R²）
-│   └── utils/                  # 工具函数
-└── runs/                       # 实验结果输出
+│   │   └── audio_parsing_dataset.py  # Data loader
+│   ├── losses/                 # Loss functions
+│   ├── metrics/                # Metrics (CCC, MSE, R²)
+│   └── utils/                  # Utility functions
+└── runs/                       # Experiment outputs
     └── <dataset>/<model>/<method>/exp_N/
 ```
 
 ---
 
-## 模型架构
+## Model Architecture
 
-**AudioClassifier** 核心组件：
+**AudioClassifier** core components:
 
-1. **音频编码器：** 预训练模型（Wav2Vec2/HuBERT/WavLM）提取音频特征
-2. **音高嵌入：** Linear 或 CNN 将音高特征投影到隐藏维度
-3. **多头注意力融合：** 音频与音高特征交互
-4. **输出层：** 线性层预测 V/A 连续值
-
----
-
-## 实验结果
-
-训练结果保存在 `runs/<dataset>/<model>/<method>/exp_N/` 目录：
-
-- `config.yaml` - 实验配置
-- `train_log.txt` - 训练日志
-- `best_model.pth` - 最佳模型权重
-- `metrics.json` - 评价指标
+1. **Audio Encoder:** Pretrained model (Wav2Vec2/HuBERT/WavLM) extracts audio features
+2. **Pitch Embedding:** Linear or CNN projects pitch features to hidden dimension
+3. **Multi-Head Attention Fusion:** Audio and pitch feature interaction
+4. **Output Layer:** Linear layer predicts continuous V/A values
 
 ---
+
+## Experiment Results
+
+Training results are saved in `runs/<dataset>/<model>/<method>/exp_N/`:
+
+- `config.yaml` - Experiment configuration
+- `train_log.txt` - Training logs
+- `best_model.pth` - Best model checkpoint
+- `metrics.json` - Evaluation metrics
 
