@@ -1,0 +1,35 @@
+IEMOCAP 5-fold split by session (cyclic val/test)
+Method:
+- Use 5 sessions (Session1-Session5)
+- For fold i: test=Session i, val=Session i+1 (cyclic), train=others
+
+Fold mapping and counts:
+Fold 1:
+  train: Session3, Session4, Session5
+  val:   Session2
+  test:  Session1
+  counts: train=6409, val=1811, test=1819
+
+Fold 2:
+  train: Session1, Session4, Session5
+  val:   Session3
+  test:  Session2
+  counts: train=6092, val=2136, test=1811
+
+Fold 3:
+  train: Session1, Session2, Session5
+  val:   Session4
+  test:  Session3
+  counts: train=5800, val=2103, test=2136
+
+Fold 4:
+  train: Session1, Session2, Session3
+  val:   Session5
+  test:  Session4
+  counts: train=5766, val=2170, test=2103
+
+Fold 5:
+  train: Session2, Session3, Session4
+  val:   Session1
+  test:  Session5
+  counts: train=6050, val=1819, test=2170

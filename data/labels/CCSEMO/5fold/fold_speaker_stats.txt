@@ -1,0 +1,27 @@
+CCSEMO 5折数据（按说话人统计）
+统计口径：每个split内唯一说话人数量；性别按说话人计数。
+
+fold1:
+  train: 71 (M36/F35)
+  test: 12 (M2/F10)
+  val: 20 (M9/F11)
+
+fold2:
+  train: 62 (M28/F34)
+  test: 20 (M9/F11)
+  val: 21 (M10/F11)
+
+fold3:
+  train: 57 (M24/F33)
+  test: 21 (M10/F11)
+  val: 25 (M13/F12)
+
+fold4:
+  train: 53 (M21/F32)
+  test: 25 (M13/F12)
+  val: 25 (M13/F12)
+
+fold5:
+  train: 66 (M32/F34)
+  test: 25 (M13/F12)
+  val: 12 (M2/F10)
