@@ -83,7 +83,7 @@ class data_loader(Dataset):
             pitch_features = torch.tensor(pitch_cont, dtype=torch.float32)
 
             self.saved_data.append(
-                [V[i], A[i], pitch_features, waveform, sr]
+                [name[i], V[i], A[i], pitch_features, waveform, sr]
             )
 
         if self.args.normalized == "ok":
@@ -113,17 +113,20 @@ class data_loader(Dataset):
         return self.saved_data[idx]
 
     def collate_fn(self, batch):
+        batch_names = []
         batch_audio = []
         batch_va = []
         batch_raw_audio = []
         for _, row in enumerate(batch):
             (
+                name,
                 V,
                 A,
                 pitchs,
                 raw_audio,
                 sr,
             ) = row
+            batch_names.append(name)
             batch_va.append([V, A])
             batch_audio.append(pitchs)
             batch_raw_audio.append(raw_audio)
@@ -175,6 +178,7 @@ class data_loader(Dataset):
         pitch_mask = torch.stack(pitch_mask)
 
         return (
+            batch_names,
             (pitch_tensor, audio_input_values, pitch_mask, audio_attention_mask),
             torch.as_tensor(batch_va, dtype=torch.float32),
         )

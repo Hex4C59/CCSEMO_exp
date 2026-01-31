@@ -495,7 +495,7 @@ class Trainer:
                     # 在每个 batch 开始时清零梯度，确保不会累积上一个 batch 的梯度
                     self.optimizer.zero_grad()
 
-                    batch_audio, batch_vad = data
+                    _, batch_audio, batch_vad = data
 
                     pitch_data = batch_audio[0].to(self.device)
                     audio_data = batch_audio[1].to(self.device)
@@ -530,7 +530,7 @@ class Trainer:
                     dev_total_loss = 0.0
                     num_dev_samples = 0
                     for dev_data in self.dev_dataloader:
-                        batch_audio, batch_vad = dev_data
+                        _, batch_audio, batch_vad = dev_data
 
                         pitch_data = batch_audio[0].to(self.device)
                         audio_data = batch_audio[1].to(self.device)
@@ -558,7 +558,7 @@ class Trainer:
 
                 # 验证集上统一使用 CCC 作为选择最佳模型的指标
                 dev_ccc_v, dev_ccc_a = evaluate_ccc(self.vad_model, self.dev_dataloader, self.device)
- 
+
                 self.logger.info("Validation Results (CCC):")
                 dev_avg = (dev_ccc_v + dev_ccc_a) / 2
                 self.logger.info("  V (Valence):     %.4f", dev_ccc_v)

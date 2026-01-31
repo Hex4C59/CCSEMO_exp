@@ -33,7 +33,7 @@ def evaluate_ccc(
 
     with torch.no_grad():
         for _, data in enumerate(tqdm(dataloader, mininterval=10)):
-            batch_audio, batch_vad = data
+            _, batch_audio, batch_vad = data
 
             pitch_data = batch_audio[0].to(device)
             audio_data = batch_audio[1].to(device)
