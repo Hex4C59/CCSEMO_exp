@@ -41,7 +41,5 @@ pretrained_model/
 exp+results.csv
 runs/
 configs/
+scripts/
 
-
-# Serena MCP
-.serena/
