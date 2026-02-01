@@ -1,10 +1,10 @@
 import os
-import shutil
 from types import SimpleNamespace
-from typing import Tuple
+
+import yaml
 
 
-def setup_experiment_directories(args: SimpleNamespace) -> Tuple[str, str, str]:
+def setup_experiment_directories(args: SimpleNamespace) -> tuple[str, str, str]:
     """创建唯一实验目录，返回 (experiment_name, load_model_path, logger_path).
 
     目录层级设计为:
@@ -24,7 +24,9 @@ def setup_experiment_directories(args: SimpleNamespace) -> Tuple[str, str, str]:
     def _sanitize(name: str) -> str:
         name = os.path.basename(str(name)).strip()
         # 仅保留常见可见字符，其他替换为 '-'
-        allowed = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.")
+        allowed = set(
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_."
+        )
         return "".join(ch if ch in allowed else "-" for ch in name)
 
     # ===== 1) 数据集维度：来自 config 所在子目录 =====
@@ -45,7 +47,9 @@ def setup_experiment_directories(args: SimpleNamespace) -> Tuple[str, str, str]:
     dataset_name = _sanitize(dataset_raw) or "unknown_dataset"
 
     # ===== 2) 预训练模型维度：来自 audio_model_name =====
-    model_name_raw = getattr(args, "audio_model_name", "unknown_model") or "unknown_model"
+    model_name_raw = (
+        getattr(args, "audio_model_name", "unknown_model") or "unknown_model"
+    )
     model_name = _sanitize(model_name_raw) or "unknown_model"
 
     # ===== 3) 方法 + target 维度 =====
@@ -99,9 +103,11 @@ def setup_experiment_directories(args: SimpleNamespace) -> Tuple[str, str, str]:
     args.load_model_path = run_dir
     args.logger_path = os.path.join(run_dir, "train.log")
 
-    # 尝试保存 config
-    if hasattr(args, "_config_file_path"):
-        shutil.copy2(args._config_file_path, os.path.join(run_dir, "config.yaml"))
+    # 保存实际使用的配置（包括命令行覆盖的参数）
+    config_save_path = os.path.join(run_dir, "config.yaml")
+    args_dict = {k: v for k, v in vars(args).items() if not k.startswith("_")}
+    with open(config_save_path, "w", encoding="utf-8") as f:
+        yaml.dump(args_dict, f, default_flow_style=False, allow_unicode=True)
 
     return experiment_name, args.load_model_path, args.logger_path
 
@@ -134,21 +140,13 @@ def save_experiment_results(
         f.write(f"A (Arousal): {ccc_a:.4f}\n")
         f.write(f"Average: {ccc_avg:.4f}\n")
 
-        if (
-            mse_v is not None
-            and mse_a is not None
-            and mse_avg is not None
-        ):
+        if mse_v is not None and mse_a is not None and mse_avg is not None:
             f.write("\nBest Test Results (MSE, at best epoch):\n")
             f.write(f"V (Valence): {mse_v:.4f}\n")
             f.write(f"A (Arousal): {mse_a:.4f}\n")
             f.write(f"Average: {mse_avg:.4f}\n")
 
-        if (
-            r2_v is not None
-            and r2_a is not None
-            and r2_avg is not None
-        ):
+        if r2_v is not None and r2_a is not None and r2_avg is not None:
             f.write("\nBest Test Results (R2, at best epoch):\n")
             f.write(f"V (Valence): {r2_v:.4f}\n")
             f.write(f"A (Arousal): {r2_a:.4f}\n")

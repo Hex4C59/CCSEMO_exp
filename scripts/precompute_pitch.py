@@ -158,7 +158,7 @@ DATASET_PRESETS = {
     },
     # CCSEMO: 使用单一 labels.csv, 已包含 audio_path + split_set.
     "ccsemo": {
-        "text_cap_path": "data/labels/CCSEMO/labels.csv",
+        "text_cap_path": "data/labels/CCSEMO/ccsemo_label.csv",
         "audio_root": "",
         "pitch_cache_dir": "data/processed/pitch_cache_ccsemo",
     },

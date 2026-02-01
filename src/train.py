@@ -1,31 +1,33 @@
-
 import argparse
 import copy
 import os
 import shutil
 import subprocess
 import sys
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from argparse import ArgumentParser, Namespace
-from torch._C import device
-from torch import nn
+
 import matplotlib.pyplot as plt
 import torch
-from torch.utils.data import DataLoader
-from transformers import (
-    get_linear_schedule_with_warmup,
-    get_cosine_schedule_with_warmup,
-)
-from tqdm import tqdm
 import yaml
-from model import AudioClassifier
+from torch import nn
+from torch._C import device
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+from transformers import (
+    get_cosine_schedule_with_warmup,
+    get_linear_schedule_with_warmup,
+)
+
 from data import data_loader
 from metrics import evaluate_ccc, evaluate_mse, evaluate_r2
+from model import AudioClassifier
 from utils import (
-    setup_logger,
+    save_experiment_results,
     set_seed,
     setup_experiment_directories,
-    save_experiment_results,
+    setup_logger,
 )
 from utils.data_loading import load_label_splits
 
@@ -55,7 +57,6 @@ def _find_free_visible_gpu() -> int | None:
     else:
         visible_global_ids = None
 
-
     q_gpu = subprocess.run(
         [
             "nvidia-smi",
@@ -66,7 +67,6 @@ def _find_free_visible_gpu() -> int | None:
         capture_output=True,
         text=True,
     )
-
 
     index_to_uuid: dict[int, str] = {}
     for line in q_gpu.stdout.strip().splitlines():
@@ -79,7 +79,6 @@ def _find_free_visible_gpu() -> int | None:
             continue
         uuid = parts[1]
         index_to_uuid[idx] = uuid
-
 
     q_apps = subprocess.run(
         [
@@ -97,7 +96,6 @@ def _find_free_visible_gpu() -> int | None:
         if line.strip() and "No running" not in line
     }
 
-
     # 决定要检查的物理 GPU index 列表
     if visible_global_ids is not None:
         candidate_global_ids = [
@@ -107,10 +105,7 @@ def _find_free_visible_gpu() -> int | None:
         candidate_global_ids = sorted(index_to_uuid.keys())
 
     if not candidate_global_ids:
-        print(
-            "[warn] 未在 nvidia-smi 输出中找到任何可见 GPU, "
-            "将回退到 cuda:0"
-        )
+        print("[warn] 未在 nvidia-smi 输出中找到任何可见 GPU, 将回退到 cuda:0")
         return 0
 
     # 在可见的物理卡中找“无 compute 进程”的卡
@@ -125,6 +120,7 @@ def _find_free_visible_gpu() -> int | None:
         return None
 
     return min(free_local_indices)
+
 
 def _resolve_device(args) -> torch.device:
     """根据配置和当前 GPU 占用情况, 选择运行设备.
@@ -173,10 +169,11 @@ class Trainer:
         self._check_args(args)
         self.args = args
 
-
         self.args.target = "both"
 
-        self.experiment_name, self.args.load_model_path, self.args.logger_path = setup_experiment_directories(self.args)
+        self.experiment_name, self.args.load_model_path, self.args.logger_path = (
+            setup_experiment_directories(self.args)
+        )
 
         # 统一通过 _resolve_device 选择运行设备 (支持自动选择空闲 GPU)
         self.device: device = _resolve_device(self.args)
@@ -262,11 +259,11 @@ class Trainer:
                         coerced = int(value)
                         setattr(args, field, coerced)
                         value = coerced
-                    elif expected_type is float:
-                        coerced = float(value)
-                        setattr(args, field, coerced)
-                        value = coerced
-                    elif isinstance(expected_type, tuple) and float in expected_type:
+                    elif (
+                        expected_type is float
+                        or isinstance(expected_type, tuple)
+                        and float in expected_type
+                    ):
                         coerced = float(value)
                         setattr(args, field, coerced)
                         value = coerced
@@ -276,28 +273,24 @@ class Trainer:
 
             if not isinstance(value, expected_type):
                 wrong_types.append(
-                    f"{field} (got {type(value).__name__}, "
-                    f"expected {expected_type})"
+                    f"{field} (got {type(value).__name__}, expected {expected_type})"
                 )
 
         if missing:
             raise ValueError(
-                "Missing required config fields: "
-                + ", ".join(sorted(missing))
+                "Missing required config fields: " + ", ".join(sorted(missing))
             )
 
         if wrong_types:
             raise ValueError(
-                "Config fields have unexpected types: "
-                + "; ".join(wrong_types)
+                "Config fields have unexpected types: " + "; ".join(wrong_types)
             )
 
         # target 如果给了就校验取值；当前仅支持 both
         target = getattr(args, "target", None)
         if target is not None and target != "both":
             raise ValueError(
-                f"Unsupported target '{target}'. "
-                "Supported targets are: ['both']"
+                f"Unsupported target '{target}'. Supported targets are: ['both']"
             )
 
     def set_logger(self):
@@ -315,9 +308,7 @@ class Trainer:
     def get_model(self):
         """从 self.save_path 目录下加载 model.bin 权重文件."""
         model_path = os.path.join(self.save_path, "model.bin")
-        self.vad_model.load_state_dict(
-            torch.load(model_path, map_location=self.device)
-        )
+        self.vad_model.load_state_dict(torch.load(model_path, map_location=self.device))
         self.vad_model.eval()
 
     def _is_better(self, curr_score: float) -> bool:
@@ -350,12 +341,9 @@ class Trainer:
             warmup_ratio = float(warmup_ratio_cfg)
             if not 0.0 <= warmup_ratio <= 1.0:
                 raise ValueError(
-                    "warmup_ratio 应该在 [0, 1] 范围内，"
-                    f"当前为: {warmup_ratio}"
+                    f"warmup_ratio 应该在 [0, 1] 范围内，当前为: {warmup_ratio}"
                 )
-            self.num_warmup_steps = int(
-                self.num_training_steps * warmup_ratio
-            )
+            self.num_warmup_steps = int(self.num_training_steps * warmup_ratio)
         else:
             # 未配置时默认不开启 warmup
             self.num_warmup_steps = 0
@@ -392,7 +380,6 @@ class Trainer:
         if not train_losses or not val_losses:
             return
 
-
         epochs = range(1, len(train_losses) + 1)
         fig_path = os.path.join(self.save_path, "loss_curve.png")
 
@@ -412,7 +399,6 @@ class Trainer:
             self.logger.info("损失曲线已保存到: %s", fig_path)
 
     def train(self):
-
         splits = load_label_splits(self.args.text_cap_path)
         train = splits["train"]
         val = splits["val"]
@@ -431,13 +417,13 @@ class Trainer:
         self.dev_dataloader = DataLoader(
             dataset=self.dev_dataset,
             batch_size=self.args.eval_batch_size,
-            shuffle=False,  
+            shuffle=False,
             collate_fn=self.dev_dataset.collate_fn,
         )
         self.test_dataloader = DataLoader(
             dataset=self.test_dataset,
             batch_size=self.args.eval_batch_size,
-            shuffle=False,  
+            shuffle=False,
             collate_fn=self.test_dataset.collate_fn,
         )
 
@@ -462,8 +448,7 @@ class Trainer:
             "CCC",
         )
         self.logger.info(
-            "Early stopping: %s (metric=dev_avg CCC, patience=%d, "
-            "min_delta=%.4f).",
+            "Early stopping: %s (metric=dev_avg CCC, patience=%d, min_delta=%.4f).",
             "ON" if self.early_stopping_enabled else "OFF",
             self.early_stopping_patience,
             self.early_stopping_min_delta,
@@ -503,7 +488,9 @@ class Trainer:
                     audio_mask = batch_audio[3].to(self.device)
                     batch_vad = batch_vad.to(self.device)
 
-                    pred_logits = self.vad_model(pitch_data, audio_data, pitch_mask, audio_mask)
+                    pred_logits = self.vad_model(
+                        pitch_data, audio_data, pitch_mask, audio_mask
+                    )
 
                     loss_val = self.mse_loss(pred_vads=pred_logits, vads=batch_vad)
 
@@ -538,26 +525,33 @@ class Trainer:
                         audio_mask = batch_audio[3].to(self.device)
                         batch_vad = batch_vad.to(self.device)
 
-                        dev_logits = self.vad_model(pitch_data, audio_data, pitch_mask, audio_mask)
+                        dev_logits = self.vad_model(
+                            pitch_data, audio_data, pitch_mask, audio_mask
+                        )
 
                         dev_loss = self.mse_loss(pred_vads=dev_logits, vads=batch_vad)
                         batch_size = batch_vad.size(0)
                         dev_total_loss += dev_loss.item() * batch_size
                         num_dev_samples += batch_size
 
-
                 dev_avg_loss = dev_total_loss / max(num_dev_samples, 1)
                 val_losses.append(dev_avg_loss)
 
                 self.logger.info("\n%s", "=" * 80)
-                self.logger.info("Epoch %d/%d - [VALIDATION]",epoch + 1, self.training_epochs,)
+                self.logger.info(
+                    "Epoch %d/%d - [VALIDATION]",
+                    epoch + 1,
+                    self.training_epochs,
+                )
                 self.logger.info("%s", "=" * 80)
 
                 self.logger.info("Train MSE Loss: %.6f", avg_loss)
                 self.logger.info("Val   MSE Loss: %.6f", dev_avg_loss)
 
                 # 验证集上统一使用 CCC 作为选择最佳模型的指标
-                dev_ccc_v, dev_ccc_a = evaluate_ccc(self.vad_model, self.dev_dataloader, self.device)
+                dev_ccc_v, dev_ccc_a = evaluate_ccc(
+                    self.vad_model, self.dev_dataloader, self.device
+                )
 
                 self.logger.info("Validation Results (CCC):")
                 dev_avg = (dev_ccc_v + dev_ccc_a) / 2
@@ -580,7 +574,11 @@ class Trainer:
                     # 一旦有“真正变好”的 epoch，就重置 patience 计数
                     epochs_without_improvement = 0
 
-                    self.logger.info("\n*** New best model found at epoch %d! " "Val score: %.4f ***", self.best_epoch, self.best_score)
+                    self.logger.info(
+                        "\n*** New best model found at epoch %d! Val score: %.4f ***",
+                        self.best_epoch,
+                        self.best_score,
+                    )
 
                     # 在 Test 集上计算 CCC，记录当前最佳模型的性能（便于中途查看）
                     best_test_metric_v, best_test_metric_a = evaluate_ccc(
@@ -590,9 +588,15 @@ class Trainer:
                     )
 
                     best_test_avg = (best_test_metric_v + best_test_metric_a) / 2
-                    self.best_test_metrics = (best_test_metric_v, best_test_metric_a, best_test_avg)
+                    self.best_test_metrics = (
+                        best_test_metric_v,
+                        best_test_metric_a,
+                        best_test_avg,
+                    )
 
-                    self.logger.info("Best (so far) Test Results (CCC) at epoch %d:", self.best_epoch)
+                    self.logger.info(
+                        "Best (so far) Test Results (CCC) at epoch %d:", self.best_epoch
+                    )
                     self.logger.info("  V (Valence):     %.4f", best_test_metric_v)
                     self.logger.info("  A (Arousal):     %.4f", best_test_metric_a)
                     self.logger.info("  Average:         %.4f", best_test_avg)
@@ -626,8 +630,7 @@ class Trainer:
                     if (
                         self.early_stopping_enabled
                         and self.best_model_state is not None
-                        and epochs_without_improvement
-                        >= self.early_stopping_patience
+                        and epochs_without_improvement >= self.early_stopping_patience
                     ):
                         self.logger.info(
                             "触发 early stopping: 连续 %d 个 epoch dev_avg "
@@ -747,7 +750,7 @@ def main():
 
     config_path = arg_.config
 
-    with open(file=arg_.config) as config_file:
+    with open(file=config_path) as config_file:
         args_dict = yaml.safe_load(stream=config_file)
 
     # 若通过命令行指定了预训练模型, 优先使用命令行参数覆盖配置文件中的 audio_model_name

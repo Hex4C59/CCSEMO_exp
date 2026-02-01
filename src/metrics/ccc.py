@@ -1,8 +1,7 @@
-from typing import Optional, Tuple
-
 import numpy as np
 import torch
 from tqdm import tqdm
+
 
 def concordance_correlation_coefficient(
     observed: np.ndarray,
@@ -17,23 +16,29 @@ def concordance_correlation_coefficient(
     covariance = np.cov(observed, predicted, ddof=1)[0, 1]
     obs_variance = np.var(observed, ddof=1)
     pred_variance = np.var(predicted, ddof=1)
-    ccc = 2 * covariance / (obs_variance + pred_variance + (mean_observed - mean_predicted) ** 2)
+    ccc = (
+        2
+        * covariance
+        / (obs_variance + pred_variance + (mean_observed - mean_predicted) ** 2)
+    )
     return float(ccc)
+
 
 def evaluate_ccc(
     model: torch.nn.Module,
     dataloader,
     device: torch.device,
-    save_details_path: Optional[str] = None,
-) -> Tuple[float, float]:
+    save_details_path: str | None = None,
+) -> tuple[float, float]:
     model.eval()
 
+    all_names = []
     logits_v, logits_a = [], []
     v, a = [], []
 
     with torch.no_grad():
         for _, data in enumerate(tqdm(dataloader, mininterval=10)):
-            _, batch_audio, batch_vad = data
+            batch_names, batch_audio, batch_vad = data
 
             pitch_data = batch_audio[0].to(device)
             audio_data = batch_audio[1].to(device)
@@ -49,6 +54,7 @@ def evaluate_ccc(
             batch_v = batch_vad[:, 0].cpu().numpy()
             batch_a = batch_vad[:, 1].cpu().numpy()
 
+            all_names.extend(batch_names)
             logits_v.append(pred_v)
             logits_a.append(pred_a)
 
@@ -69,6 +75,7 @@ def evaluate_ccc(
             os.makedirs(os.path.dirname(save_details_path), exist_ok=True)
             pd.DataFrame(
                 {
+                    "name": all_names,
                     "true_v": v,
                     "pred_v": logits_v,
                     "true_a": a,
@@ -82,4 +89,3 @@ def evaluate_ccc(
     ccc_a = concordance_correlation_coefficient(a, logits_a)
 
     return ccc_v, ccc_a
-
